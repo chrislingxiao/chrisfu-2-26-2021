@@ -5,13 +5,14 @@ import { RouterModule } from '@angular/router';
 
 import { ItemTableComponent } from './components';
 import { MoneyFormatPipe } from './pipes';
+import { NgZorroModule } from './ng-zorro.moddule';
 
 const COMPONENTS = [ItemTableComponent];
 
 const PIPES = [MoneyFormatPipe];
 
 @NgModule({
-  imports: [RouterModule, CommonModule, FormsModule, ReactiveFormsModule],
+  imports: [RouterModule, CommonModule, FormsModule, ReactiveFormsModule, NgZorroModule],
   declarations: [...COMPONENTS, ...PIPES, ItemTableComponent],
   exports: [CommonModule, FormsModule, ReactiveFormsModule, ...COMPONENTS, ...PIPES],
   providers: [CurrencyPipe, DecimalPipe],
