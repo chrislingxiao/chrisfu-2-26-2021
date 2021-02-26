@@ -1,13 +1,13 @@
-import { ItemTableOptions } from './../../../../shared/components/item-table/models/item-table-options.model';
-import { ChangeDetectionStrategy, Component, OnDestroy, OnInit } from '@angular/core';
-import { isNil } from 'lodash-es';
-import { BehaviorSubject, Subject } from 'rxjs';
+import { ChangeDetectionStrategy, Component, HostListener, OnDestroy, OnInit } from '@angular/core';
+import { NavigationStart, Router } from '@angular/router';
+
+import { BehaviorSubject, Observable, Subject } from 'rxjs';
 import { filter, takeUntil } from 'rxjs/operators';
-import { SubscriptionMessage, Level, LevelView } from '../../models';
+import { isNil } from 'lodash-es';
+
+import { SubscriptionMessage, LevelView, DataAddress } from '../../models';
 import { OrderBookService } from '../../services';
-import { BinTree, RBTree } from 'bintrees';
-import * as numeral from 'numeral';
-import { ColumnDefinition } from '@app/shared/components/item-table/models/column-definition.model';
+import { ColumnDefinition, ItemTableOptions } from '@app/shared/components/item-table/models';
 
 @Component({
   selector: 'app-orders-page',
@@ -16,18 +16,11 @@ import { ColumnDefinition } from '@app/shared/components/item-table/models/colum
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class OrdersPageComponent implements OnInit, OnDestroy {
-  private static readonly PRICE_FORMAT = '$0,0.00';
-  private static readonly GENERIC_FORMAT = '0,0';
-
   private readonly destroyed$ = new Subject();
 
-  private readonly bidTree = new RBTree((a: Level, b: Level) => {
-    return b.price - a.price;
-  });
+  private readonly subscribeMessage$ = new BehaviorSubject<SubscriptionMessage | string>(null);
 
-  private readonly askTree = new RBTree((a: Level, b: Level) => {
-    return a.price - b.price;
-  });
+  private readonly dataForAddressing$ = new BehaviorSubject<DataAddress>(null);
 
   private readonly bidTableColumnsDefinitions = [
     new ColumnDefinition({ header: 'Total', name: 'total' }),
@@ -37,7 +30,13 @@ export class OrdersPageComponent implements OnInit, OnDestroy {
 
   private readonly askTableColumnsDefinitions = this.bidTableColumnsDefinitions.slice().reverse();
 
-  constructor(private orderBookService: OrderBookService) {}
+  constructor(private router: Router, private orderBookService: OrderBookService) {
+    this.router.events.subscribe((event) => {
+      if (event instanceof NavigationStart) {
+        this.resetConnection();
+      }
+    });
+  }
 
   public readonly orderListSizeOptions = [
     {
@@ -45,34 +44,43 @@ export class OrdersPageComponent implements OnInit, OnDestroy {
       value: 10,
     },
     {
-      displayText: '25 rows',
-      value: 25,
+      displayText: '15 rows',
+      value: 15,
     },
     {
-      displayText: '50 rows',
-      value: 50,
+      displayText: '30 rows',
+      value: 30,
     },
   ];
 
-  public bids$ = new BehaviorSubject<Level[]>([]);
-  public asks$ = new BehaviorSubject<Level[]>([]);
+  public bids$ = new BehaviorSubject<LevelView[]>([]);
+  public asks$ = new BehaviorSubject<LevelView[]>([]);
 
   public bidsTableOptions: ItemTableOptions = {
     columnDefinitions: this.bidTableColumnsDefinitions,
     data$: this.bids$,
+    trackBy: (item: LevelView) => item.price,
   };
 
   public asksTableOptions: ItemTableOptions = {
     columnDefinitions: this.askTableColumnsDefinitions,
     data$: this.asks$,
+    trackBy: (item: LevelView) => item.price,
   };
 
   public selectedSize = this.orderListSizeOptions[0].value;
 
+  @HostListener('window:beforeunload', ['$event'])
+  public beforeUnloadHandler(event): void {
+    this.resetConnection();
+  }
+
   public ngOnInit(): void {
     this.subscribeOrders();
 
-    this.orderBookService.sendMessage(
+    this.subscribeDataAddress();
+
+    this.subscribeMessage$.next(
       new SubscriptionMessage({
         event: 'subscribe',
         feed: 'book_ui_1',
@@ -82,107 +90,54 @@ export class OrdersPageComponent implements OnInit, OnDestroy {
   }
 
   public ngOnDestroy(): void {
-    this.orderBookService.closeConnection();
-
-    this.destroyed$.next();
-    this.destroyed$.complete();
+    this.resetConnection();
   }
 
   private subscribeOrders(): void {
     this.orderBookService
-      .connect()
+      .connect(this.subscribeMessage$ as Observable<SubscriptionMessage>)
       .pipe(
-        filter((messages) => !isNil(messages) && !isNil(messages.bids) && !isNil(messages.bids)),
+        filter((messages) => !isNil(messages?.bids) && !isNil(messages?.bids)),
         takeUntil(this.destroyed$)
       )
       .subscribe((messages) => {
-        this.updateBids(messages.bids);
-        this.updateAsks(messages.asks);
+        this.dataForAddressing$.next(
+          new DataAddress({
+            selectedSize: this.selectedSize,
+            bids: messages.bids,
+            asks: messages.asks,
+          })
+        );
       });
   }
 
-  private updateBids(newBids: [number, number][]): void {
-    newBids.forEach((bid) => {
-      const level = new Level({
-        price: bid[0],
-        size: bid[1],
-        total: bid[1],
+  public subscribeDataAddress(): void {
+    this.orderBookService
+      .addressData(this.dataForAddressing$)
+      .pipe(
+        filter(
+          (addressedData) =>
+            !isNil(addressedData?.updatedBids) && !isNil(addressedData?.updatedAsks)
+        ),
+        takeUntil(this.destroyed$)
+      )
+      .subscribe((addressedData) => {
+        this.updateBids(addressedData.updatedBids);
+        this.updateAsks(addressedData.updatedAsks);
       });
-
-      this.addLevel('bid', level);
-    });
-
-    this.updateOrdersForView('bid');
   }
 
-  private updateAsks(newAsks: [number, number][]): void {
-    newAsks.forEach((ask) => {
-      const level = new Level({
-        price: ask[0],
-        size: ask[1],
-        total: ask[1],
-      });
-
-      this.addLevel('ask', level);
-    });
-
-    this.updateOrdersForView('ask');
+  private updateBids(updatedBids: LevelView[]): void {
+    this.bids$.next(updatedBids);
   }
 
-  private addLevel(side: 'bid' | 'ask', level: Level): void {
-    const tree = this.getTree(side);
-    let node = tree.find({ price: level.price });
-
-    if (isNil(node) && level.size > 0) {
-      node = { ...level };
-      tree.insert(node);
-    } else if (!isNil(node)) {
-      if (level.size <= 0) {
-        tree.remove(node);
-      } else {
-        node = {
-          ...node,
-          ...level,
-        };
-      }
-    }
+  private updateAsks(updatedAsks: LevelView[]): void {
+    this.asks$.next(updatedAsks);
   }
 
-  private getTree(side: 'bid' | 'ask'): BinTree<Level> {
-    if (side === 'bid') {
-      return this.bidTree;
-    }
-
-    return this.askTree;
-  }
-
-  private updateOrdersForView(side: 'bid' | 'ask') {
-    const tree = this.getTree(side);
-    const it = tree.iterator();
-    const nodeArr = [];
-    let currItem: Level = null;
-    let prevItem: Level = null;
-    let count = 0;
-
-    while (!isNil((currItem = it.next())) && count++ < this.selectedSize) {
-      const prevTotal = isNil(prevItem) ? 0 : prevItem.total;
-
-      currItem.total = currItem.size + prevTotal;
-
-      nodeArr.push(
-        new LevelView({
-          price: numeral(currItem.price).format(OrdersPageComponent.PRICE_FORMAT),
-          size: numeral(currItem.size).format(OrdersPageComponent.GENERIC_FORMAT),
-          total: numeral(currItem.total).format(OrdersPageComponent.GENERIC_FORMAT),
-        })
-      );
-      prevItem = currItem;
-    }
-
-    if (side === 'bid') {
-      this.bids$.next(nodeArr);
-    } else {
-      this.asks$.next(nodeArr);
-    }
+  private resetConnection(): void {
+    this.subscribeMessage$.next('disconnect');
+    this.destroyed$.next();
+    this.destroyed$.complete();
   }
 }

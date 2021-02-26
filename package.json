@@ -23,6 +23,7 @@
     "lodash-es": "^4.17.21",
     "ng-zorro-antd": "^11.1.0",
     "numeral": "^2.0.6",
+    "observable-webworker": "^3.2.6",
     "rxjs": "~6.6.0",
     "tslib": "^2.0.0",
     "zone.js": "~0.10.2"

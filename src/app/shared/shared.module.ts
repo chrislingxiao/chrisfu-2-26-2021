@@ -14,7 +14,7 @@ const PIPES = [MoneyFormatPipe];
 @NgModule({
   imports: [RouterModule, CommonModule, FormsModule, ReactiveFormsModule, NgZorroModule],
   declarations: [...COMPONENTS, ...PIPES],
-  exports: [CommonModule, FormsModule, ReactiveFormsModule, ...COMPONENTS, ...PIPES],
+  exports: [CommonModule, FormsModule, ReactiveFormsModule, NgZorroModule, ...COMPONENTS, ...PIPES],
   providers: [CurrencyPipe, DecimalPipe],
 })
 export class SharedModule {}

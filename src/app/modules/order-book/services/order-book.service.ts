@@ -1,41 +1,23 @@
 import { Injectable } from '@angular/core';
-import { webSocket, WebSocketSubject } from 'rxjs/webSocket';
-import { retryWhen, switchMap, delay } from 'rxjs/operators';
-import { Observable, of } from 'rxjs';
-import { environment } from 'src/environments/environment';
-import { SubscriptionMessage, RealTimeOrder } from '../models';
-
-export const WS_ENDPOINT = environment.wsEndpoint;
-const RECONNECT_INTERVAL = 3000;
+import { fromWorker } from 'observable-webworker';
+import { Observable } from 'rxjs';
+import { SubscriptionMessage, RealTimeOrder, DataAddress, DataAddressResponse } from '../models';
 
 @Injectable({
   providedIn: 'root',
 })
 export class OrderBookService {
-  private connection$: WebSocketSubject<any>;
-
-  constructor() {}
-
-  public connect(): Observable<RealTimeOrder> {
-    return of(WS_ENDPOINT).pipe(
-      switchMap((wsUrl) => {
-        if (this.connection$) {
-          return this.connection$;
-        } else {
-          this.connection$ = webSocket(wsUrl);
-          return this.connection$;
-        }
-      }),
-      retryWhen((errors) => errors.pipe(delay(RECONNECT_INTERVAL)))
+  public connect(inputs$: Observable<SubscriptionMessage>): Observable<RealTimeOrder> {
+    return fromWorker(
+      () => new Worker('../workers/order-book.worker', { type: 'module' }),
+      inputs$
     );
   }
 
-  public closeConnection() {
-    this.connection$.complete();
-    this.connection$ = null;
-  }
-
-  public sendMessage(msg: SubscriptionMessage) {
-    this.connection$.next(msg);
+  public addressData(data$: Observable<DataAddress>): Observable<DataAddressResponse> {
+    return fromWorker(
+      () => new Worker('../workers/data-address.worker', { type: 'module' }),
+      data$
+    );
   }
 }
