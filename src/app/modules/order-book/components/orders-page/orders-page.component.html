@@ -1,6 +1,11 @@
 <div class="OrderCards">
+  Show
   <nz-select [(ngModel)]="selectedSize">
-    <nz-option *ngFor="let option of orderListSizeOptions" [nzValue]="option.value" [nzLabel]="option.displayText"></nz-option>
+    <nz-option
+      *ngFor="let option of orderListSizeOptions"
+      [nzValue]="option.value"
+      [nzLabel]="option.displayText">
+    </nz-option>
   </nz-select>
   <div nz-row [nzGutter]="8">
     <div nz-col [nzSpan]="12">
