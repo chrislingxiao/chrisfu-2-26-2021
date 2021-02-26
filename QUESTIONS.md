@@ -6,7 +6,8 @@
    1. finish global error handling for webworker.
    2. add more features to table component to support different type of data cell.
    3. organize the code to have better structure and more clear responsibility for each method.
-   4. make it the same as the example.
+   4. redesign the data models to make it more clear
+   5. make it the same as the example.
 
 2. What would you have done differently if you knew this page was going to get thousands of views
    per second vs per week?
