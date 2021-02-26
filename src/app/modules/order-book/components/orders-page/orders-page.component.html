@@ -1,13 +1,20 @@
 <div class="OrderCards">
+  <nz-select [(ngModel)]="selectedSize">
+    <nz-option *ngFor="let option of orderListSizeOptions" [nzValue]="option.value" [nzLabel]="option.displayText"></nz-option>
+  </nz-select>
   <div nz-row [nzGutter]="8">
     <div nz-col [nzSpan]="12">
       <nz-card nzTitle="Bids">
-        <p>Card content</p>
+        <app-item-table
+          [options]="bidsTableOptions"
+        ></app-item-table>
       </nz-card>
     </div>
     <div nz-col [nzSpan]="12">
       <nz-card nzTitle="Asks">
-        <p>Card content</p>
+        <app-item-table
+          [options]="asksTableOptions"
+        ></app-item-table>
       </nz-card>
     </div>
   </div>

@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { NgModule } from '@angular/core';
 import { SharedModule } from '@app/shared/shared.module';
-import { NgZorroModule } from '@app/shared/ng-zorro.moddule';
+import { NgZorroModule } from '@app/shared/ng-zorro.module';
 
 import { OrderBookRoutingModule } from './order-book-routing.module';
 import { OrdersPageComponent } from './components';

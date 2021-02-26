@@ -1,3 +1,4 @@
+import { ItemTableOptions } from './../../../../shared/components/item-table/models/item-table-options.model';
 import { ChangeDetectionStrategy, Component, OnDestroy, OnInit } from '@angular/core';
 import { isNil } from 'lodash-es';
 import { BehaviorSubject, Subject } from 'rxjs';
@@ -34,12 +35,39 @@ export class OrdersPageComponent implements OnInit, OnDestroy {
     new ColumnDefinition({ header: 'Price', name: 'price' }),
   ];
 
-  private readonly askTableColumnsDefinitions = this.bidTableColumnsDefinitions.reverse();
+  private readonly askTableColumnsDefinitions = this.bidTableColumnsDefinitions.slice().reverse();
 
   constructor(private orderBookService: OrderBookService) {}
 
+  public readonly orderListSizeOptions = [
+    {
+      displayText: '10 rows',
+      value: 10,
+    },
+    {
+      displayText: '25 rows',
+      value: 25,
+    },
+    {
+      displayText: '50 rows',
+      value: 50,
+    },
+  ];
+
   public bids$ = new BehaviorSubject<Level[]>([]);
   public asks$ = new BehaviorSubject<Level[]>([]);
+
+  public bidsTableOptions: ItemTableOptions = {
+    columnDefinitions: this.bidTableColumnsDefinitions,
+    data$: this.bids$,
+  };
+
+  public asksTableOptions: ItemTableOptions = {
+    columnDefinitions: this.askTableColumnsDefinitions,
+    data$: this.asks$,
+  };
+
+  public selectedSize = this.orderListSizeOptions[0].value;
 
   public ngOnInit(): void {
     this.subscribeOrders();
@@ -105,16 +133,18 @@ export class OrdersPageComponent implements OnInit, OnDestroy {
     const tree = this.getTree(side);
     let node = tree.find({ price: level.price });
 
-    if (level.size === 0 && !isNil(node)) {
-      tree.remove(node);
-    } else if (isNil(node)) {
+    if (isNil(node) && level.size > 0) {
       node = { ...level };
       tree.insert(node);
     } else if (!isNil(node)) {
-      node = {
-        ...node,
-        ...level,
-      };
+      if (level.size <= 0) {
+        tree.remove(node);
+      } else {
+        node = {
+          ...node,
+          ...level,
+        };
+      }
     }
   }
 
@@ -132,8 +162,9 @@ export class OrdersPageComponent implements OnInit, OnDestroy {
     const nodeArr = [];
     let currItem: Level = null;
     let prevItem: Level = null;
+    let count = 0;
 
-    while (!isNil((currItem = it.next()))) {
+    while (!isNil((currItem = it.next())) && count++ < this.selectedSize) {
       const prevTotal = isNil(prevItem) ? 0 : prevItem.total;
 
       currItem.total = currItem.size + prevTotal;

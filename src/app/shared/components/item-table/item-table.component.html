@@ -1,1 +1,17 @@
-<p>item-table works!</p>
+<nz-table
+  #itemTable
+  [nzData]="options.data$ | async"
+  [nzShowPagination]="false"
+  [nzFrontPagination]="false"
+>
+  <thead>
+    <tr>
+      <th *ngFor="let col of options.columnDefinitions">{{ col.header}}</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr *ngFor="let data of itemTable.data">
+      <td *ngFor="let col of options.columnDefinitions">{{ data[col.name] }}</td>
+    </tr>
+  </tbody>
+</nz-table>
